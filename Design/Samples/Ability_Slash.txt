@@ -1,0 +1,11 @@
+Name: Slash
+Description: A simple melee strike that deals instant damage to a single target.
+Effects:
+  - Type: Damage
+    Amount: 12
+    Duration: 0
+    MaxStacks: 1
+    Priority: 0
+    Tags: Offensive.Melee
+
+Usage: In editor, create a `UAbilityDataAsset` and populate fields according to this template.
