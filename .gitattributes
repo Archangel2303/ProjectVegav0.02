@@ -1,0 +1,13 @@
+# Treat Unreal binary assets as binary and prevent EOL normalization
+*.uasset binary -text
+*.umap binary -text
+*.uplugin binary -text
+*.uproject binary -text
+
+# Packaged files
+*.pak binary -text
+
+# Ensure LFS-managed patterns (if you run `git lfs track`) are preserved
+# Example for manual LFS tracking (run locally):
+# git lfs track "*.uasset"
+# git lfs track "*.umap"

@@ -1,0 +1,56 @@
+# Unreal Engine - recommended
+# See https://github.com/github/gitignore/blob/main/UnrealEngine.gitignore
+
+# Build folders
+Binaries/
+Build/
+
+# Intermediate/derived data
+/DerivedDataCache/
+/Intermediate/
+/Saved/
+
+# Compiled source
+*.exe
+*.dll
+*.lib
+*.so
+*.dylib
+*.pdb
+
+# Project files (user/IDE specific)
+.vs/
+*.sln
+*.suo
+*.vcxproj*
+*.user
+.idea/
+
+# Unreal asset and map caches (large/binary)
+*.uasset
+*.umap
+*.upk
+*.pak
+
+# Logs and temp
+*.log
+*.tmp
+*.temp
+*.backup
+*.autosave
+
+# OneDrive and OS files
+Thumbs.db
+desktop.ini
+ehthumbs.db
+Icon
+
+# Python
+__pycache__/
+*.pyc
+
+# Ignore Visual Studio Code workspace
+.vscode/
+
+# Optional: Git LFS will handle large binary files if enabled
+# If using Git LFS, don't commit large assets directly; track them instead.
