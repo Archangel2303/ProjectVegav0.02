@@ -26,6 +26,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Augments")
     TArray<UAugmentDataAsset*> GetEquippedAugments() const;
 
+    UFUNCTION(BlueprintCallable, Category="Augments")
+    void ClearAllAugments();
+
 protected:
     virtual void BeginPlay() override;
 

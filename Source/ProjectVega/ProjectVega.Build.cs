@@ -7,7 +7,7 @@ public class ProjectVega : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "GameplayTags", "UMG", "Slate", "SlateCore", "AIModule" });
+        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "GameplayTags", "UMG", "Slate", "SlateCore", "AIModule", "InputCore" });
 
         PrivateDependencyModuleNames.AddRange(new string[] {  });
 

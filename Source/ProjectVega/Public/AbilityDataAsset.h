@@ -15,6 +15,12 @@ public:
     FName AbilityName;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    EAbilityCategory AbilityCategory = EAbilityCategory::Offensive;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    EAbilitySpecialType AbilitySpecial = EAbilitySpecialType::None;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TArray<FEffectPayload> Effects;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -23,6 +29,18 @@ public:
     /** Targeting: radius (0 = none), max targets (0 = unlimited), or target self */
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     float TargetingRadius = 0.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    EAbilityTargetingMode TargetingMode = EAbilityTargetingMode::Single;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    float SplashRadius = 0.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    int32 RandomTargetCount = 1;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    bool bIncludeCasterInAllies = true;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     int32 MaxTargets = 0;

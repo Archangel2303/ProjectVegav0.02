@@ -14,6 +14,35 @@ enum class EEffectType : uint8
     Unknown
 };
 
+UENUM(BlueprintType)
+enum class EAbilityCategory : uint8
+{
+    Offensive,
+    Defensive,
+    Utility,
+    Hack
+};
+
+UENUM(BlueprintType)
+enum class EAbilitySpecialType : uint8
+{
+    None,
+    Overdrive,
+    Herculean
+};
+
+UENUM(BlueprintType)
+enum class EAbilityTargetingMode : uint8
+{
+    Single,
+    Splash,
+    AllEnemies,
+    AllAllies,
+    Everyone,
+    RandomEnemies,
+    RandomAllies
+};
+
 USTRUCT(BlueprintType)
 struct FDamageEffectData
 {

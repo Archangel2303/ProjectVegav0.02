@@ -35,6 +35,16 @@ TArray<UAugmentDataAsset*> UAugmentComponent::GetEquippedAugments() const
     return Out;
 }
 
+void UAugmentComponent::ClearAllAugments()
+{
+    TArray<EAugmentSlot> Slots;
+    Equipped.GetKeys(Slots);
+    for (EAugmentSlot Slot : Slots)
+    {
+        UnequipAugment(Slot);
+    }
+}
+
 bool UAugmentComponent::EquipAugment(UAugmentDataAsset* Augment)
 {
     if (!Augment || !GetOwner()) return false;
