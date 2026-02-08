@@ -19,6 +19,7 @@ AProjectVegaPlayerController::AProjectVegaPlayerController()
     bEnableClickEvents = true;
     bEnableMouseOverEvents = true;
     PrimaryActorTick.bCanEverTick = true;
+    bShowFloorMapWidget = true;
 }
 
 void AProjectVegaPlayerController::BeginPlay()
@@ -41,30 +42,33 @@ void AProjectVegaPlayerController::BeginPlay()
         }
     }
 
-    if (!BattleMenuWidgetClass)
+    if (!bShowFloorMapWidget)
     {
-        BattleMenuWidgetClass = UProjectVegaBattleMenuWidget::StaticClass();
-    }
-
-    if (BattleMenuWidgetClass)
-    {
-        BattleMenuWidget = CreateWidget<UProjectVegaBattleMenuWidget>(this, BattleMenuWidgetClass);
-        if (BattleMenuWidget)
+        if (!BattleMenuWidgetClass)
         {
-            UE_LOG(LogTemp, Log, TEXT("BattleMenu: widget created"));
-            BattleMenuWidget->OnAbilitySelected.AddDynamic(this, &AProjectVegaPlayerController::HandleAbilitySelected);
-            BattleMenuWidget->OnEndTurnRequested.AddDynamic(this, &AProjectVegaPlayerController::HandleEndTurnRequested);
-            BattleMenuWidget->AddToViewport();
-            RefreshBattleMenuAbilities();
+            BattleMenuWidgetClass = UProjectVegaBattleMenuWidget::StaticClass();
+        }
+
+        if (BattleMenuWidgetClass)
+        {
+            BattleMenuWidget = CreateWidget<UProjectVegaBattleMenuWidget>(this, BattleMenuWidgetClass);
+            if (BattleMenuWidget)
+            {
+                UE_LOG(LogTemp, Log, TEXT("BattleMenu: widget created"));
+                BattleMenuWidget->OnAbilitySelected.AddDynamic(this, &AProjectVegaPlayerController::HandleAbilitySelected);
+                BattleMenuWidget->OnEndTurnRequested.AddDynamic(this, &AProjectVegaPlayerController::HandleEndTurnRequested);
+                BattleMenuWidget->AddToViewport();
+                RefreshBattleMenuAbilities();
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("BattleMenu: widget NOT created"));
+            }
         }
         else
         {
-            UE_LOG(LogTemp, Warning, TEXT("BattleMenu: widget NOT created"));
+            UE_LOG(LogTemp, Warning, TEXT("BattleMenu: widget class missing"));
         }
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("BattleMenu: widget class missing"));
     }
 
     if (bShowFloorMapWidget)

@@ -16,7 +16,11 @@ enum class EEncounterDifficulty : uint8
 UENUM(BlueprintType)
 enum class EFloorNodeType : uint8
 {
-    Normal,
+    Combat,
+    Elite,
+    Rest,
+    Shop,
+    Event,
     MiniBoss,
     Boss
 };
@@ -57,11 +61,24 @@ struct FFloorMapNode
     int32 NodeId = INDEX_NONE;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    EFloorNodeType NodeType = EFloorNodeType::Normal;
+    int32 Row = 0;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    int32 Column = 0;
+
+    // Normalized 0..1 position in the map widget
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FVector2D MapPosition = FVector2D::ZeroVector;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    EFloorNodeType NodeType = EFloorNodeType::Combat;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     EEncounterDifficulty Difficulty = EEncounterDifficulty::Easy;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     UEncounterDefinitionDataAsset* Encounter = nullptr;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TArray<int32> LinkedNodeIds;
 };
