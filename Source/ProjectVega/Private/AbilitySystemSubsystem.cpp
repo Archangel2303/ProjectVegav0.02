@@ -76,6 +76,54 @@ TArray<FGuid> UAbilitySystemSubsystem::ExecuteAbility(UAbilityDataAsset* Ability
         return Out;
     };
 
+    auto GetHealthPercent = [&](AActor* Candidate) -> float
+    {
+        if (!Candidate) return 0.f;
+        if (UAttributeComponent* Attr = Candidate->FindComponentByClass<UAttributeComponent>())
+        {
+            const float MaxHealth = FMath::Max(1.f, Attr->GetAttribute(TEXT("MaxHealth")));
+            const float CurrHealth = Attr->GetAttribute(TEXT("Health"));
+            return FMath::Clamp(CurrHealth / MaxHealth, 0.f, 1.f);
+        }
+        return 0.f;
+    };
+
+    auto ChooseByHealth = [&](const TArray<AActor*>& Candidates, bool bLowest) -> AActor*
+    {
+        AActor* Best = nullptr;
+        float BestValue = bLowest ? 1.f : 0.f;
+
+        for (AActor* Candidate : Candidates)
+        {
+            const float HealthPct = GetHealthPercent(Candidate);
+            if (!Best)
+            {
+                Best = Candidate;
+                BestValue = HealthPct;
+                continue;
+            }
+
+            if (bLowest)
+            {
+                if (HealthPct < BestValue)
+                {
+                    Best = Candidate;
+                    BestValue = HealthPct;
+                }
+            }
+            else
+            {
+                if (HealthPct > BestValue)
+                {
+                    Best = Candidate;
+                    BestValue = HealthPct;
+                }
+            }
+        }
+
+        return Best;
+    };
+
     auto ApplyMaxTargets = [&]()
     {
         if (Ability->MaxTargets > 0 && ResolvedContext.Targets.Num() > Ability->MaxTargets)
@@ -192,6 +240,46 @@ TArray<FGuid> UAbilitySystemSubsystem::ExecuteAbility(UAbilityDataAsset* Ability
             }
         }
         break;
+
+        case EAbilityTargetingMode::LowestHealthEnemy:
+        case EAbilityTargetingMode::HighestHealthEnemy:
+        case EAbilityTargetingMode::LowestHealthAlly:
+        case EAbilityTargetingMode::HighestHealthAlly:
+        {
+            TArray<AActor*> Candidates;
+            const bool bIsAlly = (Ability->TargetingMode == EAbilityTargetingMode::LowestHealthAlly
+                || Ability->TargetingMode == EAbilityTargetingMode::HighestHealthAlly);
+            const bool bPickLowest = (Ability->TargetingMode == EAbilityTargetingMode::LowestHealthAlly
+                || Ability->TargetingMode == EAbilityTargetingMode::LowestHealthEnemy);
+
+            for (AActor* Candidate : CollectAllActors())
+            {
+                if (!Candidate) continue;
+                if (bIsAlly)
+                {
+                    if (!Ability->bIncludeCasterInAllies && Candidate == Context.Caster)
+                    {
+                        continue;
+                    }
+                }
+                else if (Candidate == Context.Caster)
+                {
+                    continue;
+                }
+
+                if (PassesTargetFilter(Candidate))
+                {
+                    Candidates.Add(Candidate);
+                }
+            }
+
+            ResolvedContext.Targets.Reset();
+            if (AActor* Best = ChooseByHealth(Candidates, bPickLowest))
+            {
+                ResolvedContext.Targets.Add(Best);
+            }
+        }
+        break;
     }
 
     ApplyMaxTargets();
@@ -199,6 +287,15 @@ TArray<FGuid> UAbilitySystemSubsystem::ExecuteAbility(UAbilityDataAsset* Ability
     if (ResolvedContext.Targets.Num() == 0)
     {
         return CreatedEffectIds;
+    }
+
+    const int32 MinHits = FMath::Max(1, Ability->MinHitCount);
+    const int32 MaxHits = FMath::Max(MinHits, Ability->MaxHitCount);
+    int32 HitCount = MinHits;
+    if (MaxHits > MinHits)
+    {
+        FRandomStream HitStream(Context.Seed != 0 ? Context.Seed + 7 : FMath::Rand());
+        HitCount = HitStream.RandRange(MinHits, MaxHits);
     }
 
     // Attribute-cost & Cooldown checks
@@ -240,42 +337,63 @@ TArray<FGuid> UAbilitySystemSubsystem::ExecuteAbility(UAbilityDataAsset* Ability
         }
     }
 
-    // Execute payloads
-    for (const FEffectPayload& Payload : Ability->Effects)
+    // Execute payloads (repeat full payload set per hit)
+    for (int32 HitIndex = 0; HitIndex < HitCount; ++HitIndex)
     {
-        switch (Payload.EffectType)
+        for (const FEffectPayload& Payload : Ability->Effects)
         {
-            case EEffectType::Damage:
+            switch (Payload.EffectType)
             {
-                float Base = Payload.DamageParams.Amount;
-                float Amount = Base * ResolvedContext.Magnifier;
-
-                for (AActor* Target : ResolvedContext.Targets)
+                case EEffectType::Damage:
                 {
-                    if (!Target) continue;
+                    float Base = Payload.DamageParams.Amount;
+                    float Amount = Base * ResolvedContext.Magnifier;
 
-                    UAttributeComponent* Attr = Target->FindComponentByClass<UAttributeComponent>();
-                    if (Attr)
+                    for (AActor* Target : ResolvedContext.Targets)
                     {
-                        Attr->ApplyAttributeDelta(TEXT("Health"), -Amount);
-                    }
+                        if (!Target) continue;
 
-                    if (Payload.Duration > 0)
-                    {
-                        UActiveEffectComponent* ActiveComp = Target->FindComponentByClass<UActiveEffectComponent>();
-                        if (ActiveComp)
+                        UAttributeComponent* Attr = Target->FindComponentByClass<UAttributeComponent>();
+                        if (Attr)
                         {
-                            FGuid SourceId = FGuid::NewGuid();
-                            FGuid InstanceId = ActiveComp->AddActiveEffect(Payload, SourceId, Payload.Duration);
-                            CreatedEffectIds.Add(InstanceId);
+                            Attr->ApplyAttributeDelta(TEXT("Health"), -Amount);
+                        }
+
+                        if (Payload.Duration > 0)
+                        {
+                            UActiveEffectComponent* ActiveComp = Target->FindComponentByClass<UActiveEffectComponent>();
+                            if (ActiveComp)
+                            {
+                                FGuid SourceId = FGuid::NewGuid();
+                                FGuid InstanceId = ActiveComp->AddActiveEffect(Payload, SourceId, Payload.Duration);
+                                CreatedEffectIds.Add(InstanceId);
+                            }
                         }
                     }
                 }
-            }
-            break;
-
-            default:
                 break;
+
+                case EEffectType::Armor:
+                {
+                    float Base = Payload.ArmorParams.Amount;
+                    float Amount = Base * ResolvedContext.Magnifier;
+
+                    for (AActor* Target : ResolvedContext.Targets)
+                    {
+                        if (!Target) continue;
+
+                        UAttributeComponent* Attr = Target->FindComponentByClass<UAttributeComponent>();
+                        if (Attr)
+                        {
+                            Attr->ApplyAttributeDelta(TEXT("Armor"), Amount);
+                        }
+                    }
+                }
+                break;
+
+                default:
+                    break;
+            }
         }
     }
 

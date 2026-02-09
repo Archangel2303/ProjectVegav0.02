@@ -18,6 +18,12 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI")
     UAbilityDataAsset* DefaultAbility = nullptr;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI")
+    bool bUseAbilityLoadout = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI")
+    bool bRandomizeAbility = true;
+
     // If no target is passed, self will be targeted when true
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI")
     bool bTargetSelfIfNoTarget = true;

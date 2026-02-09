@@ -62,6 +62,13 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     bool bRequireAllTargetTags = false;
 
+    // Multi-hit settings (defaults to 1 hit when left unchanged)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="1", ClampMax="20"))
+    int32 MinHitCount = 1;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="1", ClampMax="20"))
+    int32 MaxHitCount = 1;
+
     // Costs
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     float FocusCost = 0.f;

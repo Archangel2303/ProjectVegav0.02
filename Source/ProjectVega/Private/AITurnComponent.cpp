@@ -4,6 +4,7 @@
 #include "TurnManager.h"
 #include "Engine/World.h"
 #include "Engine/GameInstance.h"
+#include "ProjectVegaAIPawn.h"
 
 UAITurnComponent::UAITurnComponent()
 {
@@ -12,13 +13,32 @@ UAITurnComponent::UAITurnComponent()
 
 bool UAITurnComponent::PerformAITurn(AActor* TargetOverride)
 {
-    if (!DefaultAbility || !GetOwner())
+    if (!GetOwner())
     {
         return false;
     }
 
     UAbilityExecutorComponent* Executor = GetOwner()->FindComponentByClass<UAbilityExecutorComponent>();
     if (!Executor)
+    {
+        return false;
+    }
+
+    UAbilityDataAsset* ChosenAbility = DefaultAbility;
+    if (bUseAbilityLoadout)
+    {
+        if (const AProjectVegaAIPawn* Pawn = Cast<AProjectVegaAIPawn>(GetOwner()))
+        {
+            const TArray<UAbilityDataAsset*>& Loadout = Pawn->GetAbilityLoadout();
+            if (Loadout.Num() > 0)
+            {
+                const int32 Index = bRandomizeAbility ? FMath::RandRange(0, Loadout.Num() - 1) : 0;
+                ChosenAbility = Loadout[Index];
+            }
+        }
+    }
+
+    if (!ChosenAbility)
     {
         return false;
     }
@@ -33,7 +53,7 @@ bool UAITurnComponent::PerformAITurn(AActor* TargetOverride)
         Targets.Add(GetOwner());
     }
 
-    Executor->ExecuteAbilityByTargets(DefaultAbility, Targets, 1.f);
+    Executor->ExecuteAbilityByTargets(ChosenAbility, Targets, 1.f);
 
     if (UWorld* World = GetWorld())
     {

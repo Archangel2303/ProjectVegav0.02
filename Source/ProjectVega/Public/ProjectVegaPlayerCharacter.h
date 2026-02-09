@@ -33,7 +33,11 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Abilities")
     TArray<UAbilityDataAsset*> DefaultAbilities;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Attributes|Defaults")
+    float DefaultFocus = 3.f;
+
 protected:
+    virtual void BeginPlay() override;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Abilities")
     UAbilityExecutorComponent* AbilityExecutor = nullptr;
 

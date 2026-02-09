@@ -7,6 +7,7 @@
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Rendering/DrawElements.h"
+#include "Engine/Engine.h"
 
 DECLARE_DELEGATE_OneParam(FOnFloorNodeClickedNative, int32);
 
@@ -15,19 +16,31 @@ class SProjectVegaFloorMap : public SCompoundWidget
 public:
     SLATE_BEGIN_ARGS(SProjectVegaFloorMap) {}
         SLATE_EVENT(FOnFloorNodeClickedNative, OnNodeClicked)
+        SLATE_ARGUMENT(bool, bUseBackdrop)
     SLATE_END_ARGS()
 
     void Construct(const FArguments& InArgs)
     {
         OnNodeClicked = InArgs._OnNodeClicked;
+        bUseBackdrop = InArgs._bUseBackdrop;
 
         ChildSlot
         [
-            SNew(SBorder)
-            .Padding(FMargin(12.f))
-            .BorderBackgroundColor(FLinearColor(0.05f, 0.07f, 0.1f, 0.9f))
+            SNew(SOverlay)
+            + SOverlay::Slot()
             [
-                SAssignNew(Canvas, SConstraintCanvas)
+                SNew(SBorder)
+                .Padding(FMargin(12.f))
+                .BorderBackgroundColor(bUseBackdrop ? FLinearColor(0.f, 0.f, 0.f, 0.7f) : FLinearColor(0.f, 0.f, 0.f, 0.f))
+            ]
+            + SOverlay::Slot()
+            [
+                SNew(SBorder)
+                .Padding(FMargin(12.f))
+                .BorderBackgroundColor(FLinearColor(0.05f, 0.07f, 0.1f, 0.9f))
+                [
+                    SAssignNew(Canvas, SConstraintCanvas)
+                ]
             ]
         ];
     }
@@ -35,6 +48,12 @@ public:
     void SetNodes(const TArray<FFloorMapNode>& InNodes)
     {
         Nodes = InNodes;
+        RefreshList();
+    }
+
+    void SetSelectableIds(const TSet<int32>& InSelectable)
+    {
+        SelectableIds = InSelectable;
         RefreshList();
     }
 
@@ -48,7 +67,7 @@ private:
 
         Canvas->ClearChildren();
 
-        const FVector2D NodeSize(28.f, 28.f);
+        const FVector2D NodeSize(30.f, 30.f);
 
         for (const FFloorMapNode& Node : Nodes)
         {
@@ -57,17 +76,28 @@ private:
             .Alignment(FVector2D(0.5f, 0.5f))
             .Offset(FMargin(0.f, 0.f, NodeSize.X, NodeSize.Y))
             [
-                SNew(SButton)
-                .OnClicked(this, &SProjectVegaFloorMap::HandleNodeClicked, Node.NodeId)
-                .ContentPadding(FMargin(4.f, 2.f))
+                SNew(SBorder)
+                .Padding(FMargin(2.f))
+                .BorderBackgroundColor(BuildNodeHighlightColor(Node))
                 [
-                    SNew(STextBlock)
-                    .Text(BuildNodeText(Node))
-                    .Justification(ETextJustify::Center)
-                    .ColorAndOpacity(BuildNodeColor(Node))
+                    SNew(SButton)
+                    .OnClicked(this, &SProjectVegaFloorMap::HandleNodeClicked, Node.NodeId)
+                    .ContentPadding(FMargin(4.f, 2.f))
+                    .IsEnabled(IsNodeSelectable(Node))
+                    [
+                        SNew(STextBlock)
+                        .Text(BuildNodeText(Node))
+                        .Justification(ETextJustify::Center)
+                        .ColorAndOpacity(BuildNodeColor(Node))
+                    ]
                 ]
             ];
         }
+    }
+
+    bool IsNodeSelectable(const FFloorMapNode& Node) const
+    {
+        return SelectableIds.Contains(Node.NodeId);
     }
 
     FText BuildNodeText(const FFloorMapNode& Node) const
@@ -95,6 +125,16 @@ private:
 
     FSlateColor BuildNodeColor(const FFloorMapNode& Node) const
     {
+        if (Node.bCleared)
+        {
+            return FSlateColor(FLinearColor(0.2f, 0.2f, 0.2f, 0.6f));
+        }
+
+        if (!SelectableIds.Contains(Node.NodeId))
+        {
+            return FSlateColor(FLinearColor(0.4f, 0.4f, 0.4f, 0.7f));
+        }
+
         switch (Node.NodeType)
         {
             case EFloorNodeType::Combat:
@@ -114,6 +154,21 @@ private:
             default:
                 return FSlateColor(FLinearColor::White);
         }
+    }
+
+    FSlateColor BuildNodeHighlightColor(const FFloorMapNode& Node) const
+    {
+        if (Node.bCleared)
+        {
+            return FSlateColor(FLinearColor(0.f, 0.f, 0.f, 0.f));
+        }
+
+        if (SelectableIds.Contains(Node.NodeId))
+        {
+            return FSlateColor(FLinearColor(0.9f, 0.95f, 1.f, 0.65f));
+        }
+
+        return FSlateColor(FLinearColor(0.f, 0.f, 0.f, 0.f));
     }
 
     virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry,
@@ -165,6 +220,8 @@ private:
     TArray<FFloorMapNode> Nodes;
     TSharedPtr<SConstraintCanvas> Canvas;
     FOnFloorNodeClickedNative OnNodeClicked;
+    TSet<int32> SelectableIds;
+    bool bUseBackdrop = false;
 };
 
 void UProjectVegaFloorMapWidget::SetRunState(UProjectVegaRunStateSubsystem* InRunState)
@@ -176,14 +233,21 @@ void UProjectVegaFloorMapWidget::SetRunState(UProjectVegaRunStateSubsystem* InRu
 void UProjectVegaFloorMapWidget::RefreshNodes()
 {
     CachedNodes.Reset();
+    SelectableNodeIds.Reset();
 
     if (RunState.IsValid())
     {
         CachedNodes = RunState->GetFloorNodes();
+        const TArray<int32> Selectable = RunState->GetSelectableNodeIds();
+        for (int32 Id : Selectable)
+        {
+            SelectableNodeIds.Add(Id);
+        }
     }
 
     if (FloorMapSlate.IsValid())
     {
+        FloorMapSlate->SetSelectableIds(SelectableNodeIds);
         FloorMapSlate->SetNodes(CachedNodes);
     }
 }
@@ -191,9 +255,11 @@ void UProjectVegaFloorMapWidget::RefreshNodes()
 TSharedRef<SWidget> UProjectVegaFloorMapWidget::RebuildWidget()
 {
     FloorMapSlate = SNew(SProjectVegaFloorMap)
-        .OnNodeClicked(FOnFloorNodeClickedNative::CreateUObject(this, &UProjectVegaFloorMapWidget::HandleNodeClicked));
+        .OnNodeClicked(FOnFloorNodeClickedNative::CreateUObject(this, &UProjectVegaFloorMapWidget::HandleNodeClicked))
+        .bUseBackdrop(bUseBackdrop);
 
     FloorMapSlate->SetNodes(CachedNodes);
+    FloorMapSlate->SetSelectableIds(SelectableNodeIds);
     return FloorMapSlate.ToSharedRef();
 }
 
@@ -201,10 +267,16 @@ void UProjectVegaFloorMapWidget::HandleNodeClicked(int32 NodeId)
 {
     if (RunState.IsValid())
     {
-        RunState->SelectNode(NodeId);
-        if (bAutoStartEncounter)
+        if (RunState->SelectNode(NodeId))
         {
-            RunState->StartSelectedEncounter();
+            if (bAutoStartEncounter)
+            {
+                RunState->StartSelectedEncounter();
+            }
+        }
+        else if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("Node not selectable."));
         }
     }
 

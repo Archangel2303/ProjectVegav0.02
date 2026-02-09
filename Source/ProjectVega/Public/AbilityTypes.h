@@ -8,6 +8,7 @@ UENUM(BlueprintType)
 enum class EEffectType : uint8
 {
     Damage,
+    Armor,
     DOT,
     Buff,
     Heal,
@@ -40,11 +41,24 @@ enum class EAbilityTargetingMode : uint8
     AllAllies,
     Everyone,
     RandomEnemies,
-    RandomAllies
+    RandomAllies,
+    LowestHealthEnemy,
+    LowestHealthAlly,
+    HighestHealthEnemy,
+    HighestHealthAlly
 };
 
 USTRUCT(BlueprintType)
 struct FDamageEffectData
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    float Amount = 0.f;
+};
+
+USTRUCT(BlueprintType)
+struct FArmorEffectData
 {
     GENERATED_BODY()
 
@@ -74,6 +88,9 @@ struct FEffectPayload
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     FDamageEffectData DamageParams;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FArmorEffectData ArmorParams;
 };
 
 USTRUCT(BlueprintType)

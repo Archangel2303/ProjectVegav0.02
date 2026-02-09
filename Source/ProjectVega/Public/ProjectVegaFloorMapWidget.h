@@ -24,6 +24,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="FloorMap")
     void SetAutoStartEncounter(bool bInAutoStart) { bAutoStartEncounter = bInAutoStart; }
 
+    UFUNCTION(BlueprintCallable, Category="FloorMap")
+    void SetUseBackdrop(bool bInUseBackdrop) { bUseBackdrop = bInUseBackdrop; }
+
     UPROPERTY(BlueprintAssignable, Category="FloorMap")
     FOnFloorNodeChosen OnNodeChosen;
 
@@ -35,6 +38,8 @@ private:
 
     TWeakObjectPtr<UProjectVegaRunStateSubsystem> RunState;
     TArray<FFloorMapNode> CachedNodes;
+    TSet<int32> SelectableNodeIds;
     TSharedPtr<class SProjectVegaFloorMap> FloorMapSlate;
     bool bAutoStartEncounter = true;
+    bool bUseBackdrop = false;
 };

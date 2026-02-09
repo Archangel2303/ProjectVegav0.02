@@ -1,5 +1,6 @@
 #include "AttributeComponent.h"
 #include "GameFramework/Actor.h"
+#include "TurnManager.h"
 
 UAttributeComponent::UAttributeComponent()
 {
@@ -10,22 +11,47 @@ void UAttributeComponent::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Ensure some sensible defaults (can be overridden in editor)
-    if (!Attributes.Contains(TEXT("Health")))
+    SyncDefaultsToMap(false);
+
+    if (UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr)
     {
-        Attributes.Add(TEXT("Health"), 100.f);
+        if (UTurnManager* TurnManager = GI->GetSubsystem<UTurnManager>())
+        {
+            TurnManager->OnTurnAdvanced.AddDynamic(this, &UAttributeComponent::HandleTurnAdvanced);
+        }
     }
-    if (!Attributes.Contains(TEXT("BaseMaxHealth")))
+}
+
+void UAttributeComponent::HandleTurnAdvanced(int32 TurnNumber)
+{
+    Attributes.FindOrAdd(TEXT("Armor"), 0.f) = 0.f;
+}
+
+#if WITH_EDITOR
+void UAttributeComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+    Super::PostEditChangeProperty(PropertyChangedEvent);
+    SyncDefaultsToMap(true);
+}
+#endif
+
+void UAttributeComponent::SyncDefaultsToMap(bool bForce)
+{
+    if (bForce || !Attributes.Contains(TEXT("Health")))
     {
-        Attributes.Add(TEXT("BaseMaxHealth"), 100.f);
+        Attributes.Add(TEXT("Health"), DefaultHealth);
     }
-    if (!Attributes.Contains(TEXT("SoftcapPercent")))
+    if (bForce || !Attributes.Contains(TEXT("BaseMaxHealth")))
     {
-        Attributes.Add(TEXT("SoftcapPercent"), 0.f);
+        Attributes.Add(TEXT("BaseMaxHealth"), DefaultBaseMaxHealth);
     }
-    if (!Attributes.Contains(TEXT("Focus")))
+    if (bForce || !Attributes.Contains(TEXT("Armor")))
     {
-        Attributes.Add(TEXT("Focus"), 0.f);
+        Attributes.Add(TEXT("Armor"), DefaultArmor);
+    }
+    if (bForce || !Attributes.Contains(TEXT("SoftcapPercent")))
+    {
+        Attributes.Add(TEXT("SoftcapPercent"), DefaultSoftcapPercent);
     }
 }
 
@@ -46,7 +72,18 @@ float UAttributeComponent::ApplyAttributeDelta(FName AttributeName, float Delta)
     if (AttributeName == TEXT("Health"))
     {
         float& Curr = Attributes.FindOrAdd(TEXT("Health"), 0.f);
-        Curr += Delta;
+        if (Delta < 0.f)
+        {
+            float& Armor = Attributes.FindOrAdd(TEXT("Armor"), 0.f);
+            const float Incoming = -Delta;
+            const float Absorbed = FMath::Min(Armor, Incoming);
+            Armor -= Absorbed;
+            Curr -= (Incoming - Absorbed);
+        }
+        else
+        {
+            Curr += Delta;
+        }
         float MaxEff = GetEffectiveMaxHealth();
         Curr = FMath::Clamp(Curr, 0.f, MaxEff);
         return Curr;
@@ -71,7 +108,35 @@ float UAttributeComponent::ApplyAttributeDelta(FName AttributeName, float Delta)
 
     float& Val = Attributes.FindOrAdd(AttributeName, 0.f);
     Val += Delta;
+    if (AttributeName == TEXT("Armor"))
+    {
+        Val = FMath::Max(0.f, Val);
+    }
     return Val;
+}
+
+void UAttributeComponent::SetAttribute(FName AttributeName, float Value)
+{
+    if (AttributeName == TEXT("Health"))
+    {
+        const float MaxEff = GetEffectiveMaxHealth();
+        Attributes.FindOrAdd(TEXT("Health"), 0.f) = FMath::Clamp(Value, 0.f, MaxEff);
+        return;
+    }
+
+    if (AttributeName == TEXT("SoftcapPercent"))
+    {
+        Attributes.FindOrAdd(TEXT("SoftcapPercent"), 0.f) = FMath::Clamp(Value, 0.f, 1.f);
+        const float MaxEff = GetEffectiveMaxHealth();
+        float& Curr = Attributes.FindOrAdd(TEXT("Health"), 0.f);
+        if (Curr > MaxEff)
+        {
+            Curr = MaxEff;
+        }
+        return;
+    }
+
+    Attributes.FindOrAdd(AttributeName, 0.f) = Value;
 }
 
 float UAttributeComponent::GetEffectiveMaxHealth() const

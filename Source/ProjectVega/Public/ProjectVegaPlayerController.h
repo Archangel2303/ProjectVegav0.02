@@ -7,7 +7,10 @@
 class UTurnEndWidget;
 class UProjectVegaBattleMenuWidget;
 class UProjectVegaFloorMapWidget;
+class UProjectVegaCombatOverlayWidget;
+class UProjectVegaRewardWidget;
 class UAbilityDataAsset;
+class UAugmentDataAsset;
 
 UCLASS()
 class PROJECTVEGA_API AProjectVegaPlayerController : public APlayerController
@@ -25,6 +28,9 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI")
     TSubclassOf<UProjectVegaFloorMapWidget> FloorMapWidgetClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI")
+    TSubclassOf<UProjectVegaCombatOverlayWidget> CombatOverlayWidgetClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI")
     bool bShowFloorMapWidget = false;
@@ -55,6 +61,24 @@ protected:
     UFUNCTION()
     void HandleEndTurnRequested();
 
+    UFUNCTION()
+    void HandleToggleCombatMap();
+
+    UFUNCTION()
+    void HandleResolveEncounterDebug();
+
+    UFUNCTION()
+    void HandleRewardNanites(int32 Amount);
+
+    UFUNCTION()
+    void HandleRewardAugment(UAugmentDataAsset* Augment);
+
+    UFUNCTION()
+    void HandleRewardContinue();
+
+    UFUNCTION()
+    void HandleRewardVialOpened();
+
     void SelectAbilityByIndex(int32 Index);
     void RefreshBattleMenuAbilities();
     void UpdateTargetingPreview();
@@ -70,5 +94,16 @@ private:
     UProjectVegaFloorMapWidget* FloorMapWidget = nullptr;
 
     UPROPERTY()
+    UProjectVegaCombatOverlayWidget* CombatOverlayWidget = nullptr;
+
+    UPROPERTY()
+    UProjectVegaRewardWidget* ActiveRewardWidget = nullptr;
+
+    UPROPERTY()
     UAbilityDataAsset* SelectedAbility = nullptr;
+
+    bool bCombatMapVisible = false;
+
+    bool IsFloorMapLevel(const UProjectVegaRunStateSubsystem* RunState) const;
+    bool IsEncounterLevel(const UProjectVegaRunStateSubsystem* RunState) const;
 };

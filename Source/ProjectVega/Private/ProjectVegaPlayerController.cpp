@@ -6,12 +6,17 @@
 #include "ProjectVegaPlayerCharacter.h"
 #include "AbilityExecutorComponent.h"
 #include "AbilityDataAsset.h"
+#include "ProjectVegaCombatOverlayWidget.h"
+#include "ProjectVegaRewardWidget.h"
+#include "EncounterManager.h"
 #include "TurnManager.h"
 #include "ProjectVegaRunStateSubsystem.h"
 #include "Engine/World.h"
 #include "Engine/EngineTypes.h"
 #include "InputCoreTypes.h"
 #include "DrawDebugHelpers.h"
+#include "Kismet/GameplayStatics.h"
+#include "Misc/PackageName.h"
 
 AProjectVegaPlayerController::AProjectVegaPlayerController()
 {
@@ -19,7 +24,7 @@ AProjectVegaPlayerController::AProjectVegaPlayerController()
     bEnableClickEvents = true;
     bEnableMouseOverEvents = true;
     PrimaryActorTick.bCanEverTick = true;
-    bShowFloorMapWidget = true;
+    bShowFloorMapWidget = false;
 }
 
 void AProjectVegaPlayerController::BeginPlay()
@@ -33,7 +38,55 @@ void AProjectVegaPlayerController::BeginPlay()
 
     UE_LOG(LogTemp, Log, TEXT("BattleMenu: BeginPlay for %s"), *GetName());
 
-    if (EndTurnWidgetClass)
+    UProjectVegaRunStateSubsystem* RunState = nullptr;
+    if (UGameInstance* GI = GetWorld()->GetGameInstance())
+    {
+        RunState = GI->GetSubsystem<UProjectVegaRunStateSubsystem>();
+    }
+
+    const FName CurrentLevelName(*UGameplayStatics::GetCurrentLevelName(this, true));
+
+    const bool bIsEncounterLevel = IsEncounterLevel(RunState);
+    const bool bIsFloorMapLevel = !bIsEncounterLevel && IsFloorMapLevel(RunState);
+
+    auto RemoveWidgetIfValid = [](auto*& Widget)
+    {
+        if (Widget)
+        {
+            Widget->RemoveFromParent();
+            Widget = nullptr;
+        }
+    };
+
+    if (bIsFloorMapLevel)
+    {
+        if (RunState)
+        {
+            RunState->CacheFloorMapName(CurrentLevelName);
+        }
+        RemoveWidgetIfValid(BattleMenuWidget);
+        RemoveWidgetIfValid(EndTurnWidget);
+        RemoveWidgetIfValid(CombatOverlayWidget);
+        bCombatMapVisible = false;
+        if (FloorMapWidget)
+        {
+            FloorMapWidget->SetUseBackdrop(false);
+        }
+    }
+    else
+    {
+        if (RunState && bIsEncounterLevel)
+        {
+            RunState->CacheEncounterMapName(CurrentLevelName);
+        }
+        if (FloorMapWidget)
+        {
+            FloorMapWidget->SetVisibility(ESlateVisibility::Collapsed);
+            bCombatMapVisible = false;
+        }
+    }
+
+    if (EndTurnWidgetClass && !bIsFloorMapLevel)
     {
         EndTurnWidget = CreateWidget<UTurnEndWidget>(this, EndTurnWidgetClass);
         if (EndTurnWidget)
@@ -42,7 +95,7 @@ void AProjectVegaPlayerController::BeginPlay()
         }
     }
 
-    if (!bShowFloorMapWidget)
+    if (!bIsFloorMapLevel)
     {
         if (!BattleMenuWidgetClass)
         {
@@ -57,7 +110,7 @@ void AProjectVegaPlayerController::BeginPlay()
                 UE_LOG(LogTemp, Log, TEXT("BattleMenu: widget created"));
                 BattleMenuWidget->OnAbilitySelected.AddDynamic(this, &AProjectVegaPlayerController::HandleAbilitySelected);
                 BattleMenuWidget->OnEndTurnRequested.AddDynamic(this, &AProjectVegaPlayerController::HandleEndTurnRequested);
-                BattleMenuWidget->AddToViewport();
+                BattleMenuWidget->AddToViewport(200);
                 RefreshBattleMenuAbilities();
             }
             else
@@ -71,7 +124,7 @@ void AProjectVegaPlayerController::BeginPlay()
         }
     }
 
-    if (bShowFloorMapWidget)
+    if (bIsFloorMapLevel)
     {
         if (!FloorMapWidgetClass)
         {
@@ -83,14 +136,34 @@ void AProjectVegaPlayerController::BeginPlay()
             FloorMapWidget = CreateWidget<UProjectVegaFloorMapWidget>(this, FloorMapWidgetClass);
             if (FloorMapWidget)
             {
-                FloorMapWidget->AddToViewport();
-                if (UGameInstance* GI = GetWorld()->GetGameInstance())
-                {
-                    if (UProjectVegaRunStateSubsystem* RunState = GI->GetSubsystem<UProjectVegaRunStateSubsystem>())
-                    {
-                        FloorMapWidget->SetRunState(RunState);
-                    }
-                }
+                FloorMapWidget->SetUseBackdrop(false);
+                FloorMapWidget->AddToViewport(10);
+                FloorMapWidget->SetVisibility(ESlateVisibility::Visible);
+                FloorMapWidget->SetRunState(RunState);
+            }
+        }
+    }
+    else
+    {
+        if (FloorMapWidget)
+        {
+            FloorMapWidget->SetVisibility(ESlateVisibility::Collapsed);
+            bCombatMapVisible = false;
+        }
+
+        if (!CombatOverlayWidgetClass)
+        {
+            CombatOverlayWidgetClass = UProjectVegaCombatOverlayWidget::StaticClass();
+        }
+
+        if (CombatOverlayWidgetClass)
+        {
+            CombatOverlayWidget = CreateWidget<UProjectVegaCombatOverlayWidget>(this, CombatOverlayWidgetClass);
+            if (CombatOverlayWidget)
+            {
+                CombatOverlayWidget->OnToggleMap.AddDynamic(this, &AProjectVegaPlayerController::HandleToggleCombatMap);
+                CombatOverlayWidget->OnResolveEncounter.AddDynamic(this, &AProjectVegaPlayerController::HandleResolveEncounterDebug);
+                CombatOverlayWidget->AddToViewport(300);
             }
         }
     }
@@ -215,6 +288,214 @@ void AProjectVegaPlayerController::HandleEndTurnRequested()
     RefreshBattleMenuAbilities();
 }
 
+void AProjectVegaPlayerController::HandleToggleCombatMap()
+{
+    if (!FloorMapWidget)
+    {
+        if (!FloorMapWidgetClass)
+        {
+            FloorMapWidgetClass = UProjectVegaFloorMapWidget::StaticClass();
+        }
+
+        if (FloorMapWidgetClass)
+        {
+            FloorMapWidget = CreateWidget<UProjectVegaFloorMapWidget>(this, FloorMapWidgetClass);
+            if (FloorMapWidget)
+            {
+                if (UGameInstance* GI = GetWorld()->GetGameInstance())
+                {
+                    if (UProjectVegaRunStateSubsystem* RunState = GI->GetSubsystem<UProjectVegaRunStateSubsystem>())
+                    {
+                        FloorMapWidget->SetRunState(RunState);
+                    }
+                }
+                FloorMapWidget->SetUseBackdrop(true);
+                FloorMapWidget->AddToViewport(5);
+            }
+        }
+    }
+
+    if (FloorMapWidget)
+    {
+        bCombatMapVisible = !bCombatMapVisible;
+        FloorMapWidget->SetVisibility(bCombatMapVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+    }
+}
+
+void AProjectVegaPlayerController::HandleResolveEncounterDebug()
+{
+    if (AEncounterManager* Manager = Cast<AEncounterManager>(UGameplayStatics::GetActorOfClass(this, AEncounterManager::StaticClass())))
+    {
+        Manager->ResolveEncounterDebug(false);
+        return;
+    }
+
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor::Yellow, TEXT("Resolve: EncounterManager not found; using RunState fallback."));
+    }
+
+    if (UGameInstance* GI = GetWorld()->GetGameInstance())
+    {
+        if (UProjectVegaRunStateSubsystem* RunState = GI->GetSubsystem<UProjectVegaRunStateSubsystem>())
+        {
+            const int32 Nanites = RunState->RollRewardNanites();
+            const TArray<UAugmentDataAsset*> Augments = RunState->RollRewardAugments(3);
+
+            if (UProjectVegaRewardWidget* Widget = CreateWidget<UProjectVegaRewardWidget>(this, UProjectVegaRewardWidget::StaticClass()))
+            {
+                Widget->InitializeReward(Nanites, Augments);
+                Widget->OnNanitesAccepted.AddDynamic(this, &AProjectVegaPlayerController::HandleRewardNanites);
+                Widget->OnAugmentChosen.AddDynamic(this, &AProjectVegaPlayerController::HandleRewardAugment);
+                Widget->OnContinue.AddDynamic(this, &AProjectVegaPlayerController::HandleRewardContinue);
+                Widget->OnVialOpened.AddDynamic(this, &AProjectVegaPlayerController::HandleRewardVialOpened);
+                Widget->AddToViewport(900);
+                ActiveRewardWidget = Widget;
+
+                FInputModeGameAndUI InputMode;
+                InputMode.SetWidgetToFocus(Widget->TakeWidget());
+                InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+                SetInputMode(InputMode);
+                bShowMouseCursor = true;
+                return;
+            }
+
+            RunState->MarkEncounterResolved(true);
+        }
+    }
+}
+
+void AProjectVegaPlayerController::HandleRewardNanites(int32 Amount)
+{
+    if (UGameInstance* GI = GetWorld()->GetGameInstance())
+    {
+        if (UProjectVegaRunStateSubsystem* RunState = GI->GetSubsystem<UProjectVegaRunStateSubsystem>())
+        {
+            RunState->AddNanites(Amount);
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Yellow,
+                    FString::Printf(TEXT("Picked up %d nanites"), Amount));
+            }
+        }
+    }
+}
+
+void AProjectVegaPlayerController::HandleRewardAugment(UAugmentDataAsset* Augment)
+{
+    if (UGameInstance* GI = GetWorld()->GetGameInstance())
+    {
+        if (UProjectVegaRunStateSubsystem* RunState = GI->GetSubsystem<UProjectVegaRunStateSubsystem>())
+        {
+            RunState->AddAugmentToInventory(Augment);
+            if (GEngine)
+            {
+                const FString Name = Augment ? Augment->GetName() : TEXT("(None)");
+                GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Cyan,
+                    FString::Printf(TEXT("Picked up augment: %s"), *Name));
+            }
+        }
+    }
+}
+
+void AProjectVegaPlayerController::HandleRewardVialOpened()
+{
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Opened nanite vial"));
+    }
+}
+
+void AProjectVegaPlayerController::HandleRewardContinue()
+{
+    if (ActiveRewardWidget)
+    {
+        ActiveRewardWidget->RemoveFromParent();
+        ActiveRewardWidget = nullptr;
+    }
+
+    FInputModeGameOnly InputMode;
+    SetInputMode(InputMode);
+    bShowMouseCursor = false;
+
+    if (UGameInstance* GI = GetWorld()->GetGameInstance())
+    {
+        if (UProjectVegaRunStateSubsystem* RunState = GI->GetSubsystem<UProjectVegaRunStateSubsystem>())
+        {
+            RunState->MarkEncounterResolved(true);
+        }
+    }
+}
+
+bool AProjectVegaPlayerController::IsFloorMapLevel(const UProjectVegaRunStateSubsystem* RunState) const
+{
+    const FString LevelName = UGameplayStatics::GetCurrentLevelName(this, true);
+    if (LevelName.Contains(TEXT("Encounter"), ESearchCase::IgnoreCase))
+    {
+        return false;
+    }
+
+    if (!RunState)
+    {
+        if (LevelName.Contains(TEXT("Floormap"), ESearchCase::IgnoreCase))
+        {
+            return true;
+        }
+        return bShowFloorMapWidget;
+    }
+    const FName FloorMapName = RunState->GetFloorMapName();
+    const FName EncounterMapName = RunState->GetEncounterMapName();
+
+    if (!EncounterMapName.IsNone())
+    {
+        const FString EncounterPath = EncounterMapName.ToString();
+        const FString EncounterShort = FPackageName::GetShortName(EncounterPath);
+        if (LevelName.Equals(EncounterPath, ESearchCase::IgnoreCase)
+            || LevelName.Equals(EncounterShort, ESearchCase::IgnoreCase))
+        {
+            return false;
+        }
+    }
+
+    if (FloorMapName.IsNone())
+    {
+        if (LevelName.Contains(TEXT("Floormap"), ESearchCase::IgnoreCase))
+        {
+            return true;
+        }
+        return bShowFloorMapWidget;
+    }
+
+    const FString FloorMapPath = FloorMapName.ToString();
+    const FString FloorMapShort = FPackageName::GetShortName(FloorMapPath);
+    return LevelName.Equals(FloorMapPath, ESearchCase::IgnoreCase)
+        || LevelName.Equals(FloorMapShort, ESearchCase::IgnoreCase);
+}
+
+bool AProjectVegaPlayerController::IsEncounterLevel(const UProjectVegaRunStateSubsystem* RunState) const
+{
+    const FString LevelName = UGameplayStatics::GetCurrentLevelName(this, true);
+    if (LevelName.Contains(TEXT("Encounter"), ESearchCase::IgnoreCase))
+    {
+        return true;
+    }
+
+    if (!RunState)
+    {
+        return false;
+    }
+
+    const FName EncounterMapName = RunState->GetEncounterMapName();
+    if (EncounterMapName.IsNone())
+    {
+        return false;
+    }
+    const FString EncounterPath = EncounterMapName.ToString();
+    const FString EncounterShort = FPackageName::GetShortName(EncounterPath);
+    return LevelName.Equals(EncounterPath, ESearchCase::IgnoreCase)
+        || LevelName.Equals(EncounterShort, ESearchCase::IgnoreCase);
+}
+
 void AProjectVegaPlayerController::RefreshBattleMenuAbilities()
 {
     if (!BattleMenuWidget)
@@ -302,6 +583,30 @@ void AProjectVegaPlayerController::UpdateTargetingPreview()
             {
                 GEngine->AddOnScreenDebugMessage(43, 0.f, FColor::Green,
                     FString::Printf(TEXT("Targeting: Random Allies (%d)"), FMath::Max(1, SelectedAbility->RandomTargetCount)));
+            }
+            break;
+        case EAbilityTargetingMode::LowestHealthEnemy:
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(43, 0.f, FColor::Yellow, TEXT("Targeting: Lowest Health Enemy"));
+            }
+            break;
+        case EAbilityTargetingMode::LowestHealthAlly:
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(43, 0.f, FColor::Green, TEXT("Targeting: Lowest Health Ally"));
+            }
+            break;
+        case EAbilityTargetingMode::HighestHealthEnemy:
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(43, 0.f, FColor::Yellow, TEXT("Targeting: Highest Health Enemy"));
+            }
+            break;
+        case EAbilityTargetingMode::HighestHealthAlly:
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(43, 0.f, FColor::Green, TEXT("Targeting: Highest Health Ally"));
             }
             break;
         default:

@@ -6,6 +6,7 @@
 #include "FloorDefinitionDataAsset.generated.h"
 
 class UEncounterPoolDataAsset;
+class UAugmentPoolDataAsset;
 
 UCLASS(BlueprintType)
 class PROJECTVEGA_API UFloorDefinitionDataAsset : public UDataAsset
@@ -15,6 +16,15 @@ class PROJECTVEGA_API UFloorDefinitionDataAsset : public UDataAsset
 public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FName EncounterMapName;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FName FloorMapName;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    int32 RewardNanitesMin = 10;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    int32 RewardNanitesMax = 25;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     int32 Rows = 15;
@@ -27,6 +37,12 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     int32 MaxNodesPerRow = 5;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    int32 EntryMinNodesPerRow = 4;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    int32 EntryMaxNodesPerRow = 5;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     int32 NumMiniBossNodes = 1;
@@ -70,4 +86,7 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     UEncounterPoolDataAsset* BossPool = nullptr;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    UAugmentPoolDataAsset* FloorAugmentPool = nullptr;
 };

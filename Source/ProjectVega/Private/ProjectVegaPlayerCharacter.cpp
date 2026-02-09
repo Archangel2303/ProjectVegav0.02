@@ -17,6 +17,16 @@ AProjectVegaPlayerCharacter::AProjectVegaPlayerCharacter()
     CooldownComponent = CreateDefaultSubobject<UAbilityCooldownComponent>(TEXT("AbilityCooldowns"));
 }
 
+void AProjectVegaPlayerCharacter::BeginPlay()
+{
+    Super::BeginPlay();
+
+    if (AttributeComponent)
+    {
+        AttributeComponent->SetAttribute(TEXT("Focus"), DefaultFocus);
+    }
+}
+
 TArray<UAbilityDataAsset*> AProjectVegaPlayerCharacter::GetAvailableAbilities() const
 {
     TArray<UAbilityDataAsset*> Out;

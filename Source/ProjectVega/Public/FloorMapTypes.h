@@ -81,4 +81,10 @@ struct FFloorMapNode
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TArray<int32> LinkedNodeIds;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    bool bVisited = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    bool bCleared = false;
 };
